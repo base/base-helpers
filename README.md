@@ -16,8 +16,8 @@ Register the plugin with your [base](https://github.com/node-base/base) applicat
 
 ```js
 var Base = require('base');
-var engines = require('base-helpers');
-base.use(engines());
+var helpers = require('base-helpers');
+base.use(helpers());
 ```
 
 ## API
