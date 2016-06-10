@@ -25,15 +25,25 @@
     "define-property": "^0.2.5",
     "is-valid-app": "^0.1.0",
     "lazy-cache": "^2.0.1",
-    "load-helpers": "^0.2.10"
+    "load-helpers": "^0.2.11"
   },
   "devDependencies": {
-    "base": "^0.8.1",
+    "base": "^0.11.0",
     "gulp-format-md": "^0.1.9",
-    "is-valid-app": "^0.1.0",
     "mocha": "^2.5.3"
   },
-  "keywords": [],
+  "keywords": [
+    "app",
+    "async",
+    "base",
+    "baseplugin",
+    "engine",
+    "helper",
+    "helpers",
+    "render",
+    "template",
+    "templates"
+  ],
   "verb": {
     "toc": false,
     "layout": "default",
@@ -46,14 +56,15 @@
     "related": {
       "list": [
         "base",
+        "base-engines",
         "base-option",
-        "base-task",
-        "base-engines"
+        "base-task"
       ]
     },
     "reflinks": [
+      "base",
       "verb",
-      "base"
+      "verb-readme-generator"
     ],
     "lint": {
       "reflinks": true
