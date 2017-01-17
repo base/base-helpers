@@ -88,7 +88,7 @@ describe('helpers', function() {
       assert.equal(typeof app._.helpers.sync.z, 'function');
     });
 
-    it('should add a helper "group":', function() {
+    it('should add a helper "group" from an object:', function() {
       app.helperGroup('foo', {
         x: function() {},
         y: function() {},
@@ -98,6 +98,20 @@ describe('helpers', function() {
       assert.equal(typeof app._.helpers.sync.foo.x, 'function');
       assert.equal(typeof app._.helpers.sync.foo.y, 'function');
       assert.equal(typeof app._.helpers.sync.foo.z, 'function');
+    });
+
+    it('should add a helper "group" from a function:', function() {
+      function log() {}
+      log.warning = function() {};
+      log.success = function() {};
+      log.info = function() {};
+
+      app.helperGroup('log', log);
+
+      assert.equal(typeof app._.helpers.sync.log, 'function');
+      assert.equal(typeof app._.helpers.sync.log.warning, 'function');
+      assert.equal(typeof app._.helpers.sync.log.success, 'function');
+      assert.equal(typeof app._.helpers.sync.log.info, 'function');
     });
 
     it('should merge helpers onto a helper "group":', function() {

@@ -64,7 +64,10 @@ module.exports = function() {
      * @api public
      */
 
-    app.define('helpers', function() {
+    app.define('helpers', function(name, helpers) {
+      if (typeof name === 'string' && utils.isHelperGroup(helpers)) {
+        return this.helperGroup.apply(this, arguments);
+      }
       sync.apply(sync, arguments);
       return this;
     });
@@ -104,7 +107,10 @@ module.exports = function() {
      * @api public
      */
 
-    app.define('asyncHelpers', function() {
+    app.define('asyncHelpers', function(name, helpers) {
+      if (typeof name === 'string' && utils.isHelperGroup(helpers)) {
+        return this.helperGroup.apply(this, arguments);
+      }
       async.apply(async, arguments);
       return this;
     });
@@ -200,14 +206,44 @@ module.exports = function() {
 
     app.define('helperGroup', function(name, helpers, isAsync) {
       debug('registering helper group "%s"', name);
-      helpers = utils.arrayify(helpers);
-
       var type = isAsync ? 'async' : 'sync';
-      this._.helpers[type][name] = this._.helpers[type][name] || {};
 
-      var loader = utils.loader(this._.helpers[type][name], {async: isAsync});
+      var group = this._.helpers[type][name] || (this._.helpers[type][name] = {});
+      if (typeof helpers === 'function' && utils.isHelperGroup(helpers)) {
+        Object.defineProperty(helpers, 'isGroup', {
+          enumerable: false,
+          configurable: false,
+          value: true
+        });
+
+        if (isAsync === true) {
+          decorateHelpers(helpers, helpers, isAsync);
+        }
+
+        decorateHelpers(helpers, group, isAsync, true);
+        this._.helpers[type][name] = helpers;
+        return this;
+      }
+
+      helpers = utils.arrayify(helpers);
+      var loader = utils.loader(group, {async: isAsync});
       loader.call(loader, helpers);
       return this;
     });
   };
 };
+
+function decorateHelpers(oldHelpers, newHelpers, isAsync, override) {
+  for (let key in newHelpers) {
+    if (newHelpers.hasOwnProperty(key)) {
+      // "newHelpers" is the helpers being passed by the user
+      if (override === true && oldHelpers[key]) continue;
+      let fn = newHelpers[key];
+      if (typeof fn === 'function') {
+        fn.async = isAsync;
+      }
+      oldHelpers[key] = fn;
+    }
+  }
+}
+
