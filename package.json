@@ -1,7 +1,7 @@
 {
   "name": "base-helpers",
   "description": "Adds support for managing template helpers to your base application.",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "homepage": "https://github.com/node-base/base-helpers",
   "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
   "repository": "node-base/base-helpers",
