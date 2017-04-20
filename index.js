@@ -1,33 +1,37 @@
 /*!
- * base-helpers (https://github.com/node-base/base-helpers)
+ * base-helpers <https://github.com/node-base/base-helpers>
  *
- * Copyright (c) 2016, Jon Schlinkert.
- * Licensed under the MIT License.
+ * Copyright (c) 2016-2017, Jon Schlinkert.
+ * Released under the MIT License.
  */
 
 'use strict';
 
-var debug = require('debug')('base:helpers');
-var utils = require('./utils');
+var isObject = require('isobject');
+var HelperCache = require('helper-cache');
+var isValidApp = require('is-valid-app');
+var debug = require('debug')('base-helpers');
 
 module.exports = function() {
   return function(app) {
-    if (!utils.isValid(app)) return;
+    if (!isValid(app)) return;
+    app._ = app._ || {};
 
-    if (typeof app._ === 'undefined') {
-      utils.define(app, '_', {});
-    }
+    /**
+     * Prime the helpers cache on "app"
+     */
 
-    if (typeof app._.helpers === 'undefined') {
-      app._.helpers = {async: {}, sync: {}};
-    }
+    var helpers = app._.helpers || (app._.helpers = {async: {}, sync: {}});
 
     /**
      * Create loader objects
      */
 
-    var async = utils.loader(app._.helpers.async, {async: true});
-    var sync = utils.loader(app._.helpers.sync);
+    var async = new HelperCache({cache: helpers.async, async: true});
+    var sync = new HelperCache({cache: helpers.sync});
+
+    app._.helpers.async = async.cache;
+    app._.helpers.sync = sync.cache;
 
     /**
      * Register a template helper.
@@ -45,7 +49,7 @@ module.exports = function() {
 
     app.define('helper', function(name) {
       debug('registering sync helper "%s"', name);
-      sync.apply(sync, arguments);
+      sync.load.apply(sync, arguments);
       return this;
     });
 
@@ -65,10 +69,10 @@ module.exports = function() {
      */
 
     app.define('helpers', function(name, helpers) {
-      if (typeof name === 'string' && utils.isHelperGroup(helpers)) {
+      if (typeof name === 'string' && isHelperGroup(helpers)) {
         return this.helperGroup.apply(this, arguments);
       }
-      sync.apply(sync, arguments);
+      sync.load.apply(sync, arguments);
       return this;
     });
 
@@ -86,9 +90,12 @@ module.exports = function() {
      * @api public
      */
 
-    app.define('asyncHelper', function(name) {
+    app.define('asyncHelper', function(name, fn) {
       debug('registering async helper "%s"', name);
-      async.apply(async, arguments);
+      if (typeof fn === 'function') {
+        fn.async = true;
+      }
+      async.load.apply(async, arguments);
       return this;
     });
 
@@ -108,10 +115,10 @@ module.exports = function() {
      */
 
     app.define('asyncHelpers', function(name, helpers) {
-      if (typeof name === 'string' && utils.isHelperGroup(helpers)) {
+      if (typeof name === 'string' && isHelperGroup(helpers)) {
         return this.helperGroup.apply(this, arguments);
       }
-      async.apply(async, arguments);
+      async.load.apply(async, arguments);
       return this;
     });
 
@@ -129,7 +136,7 @@ module.exports = function() {
 
     app.define('getHelper', function(name) {
       debug('getting sync helper "%s"', name);
-      return this.get(['_.helpers.sync', name]);
+      return sync.getHelper(name);
     });
 
     /**
@@ -146,7 +153,7 @@ module.exports = function() {
 
     app.define('getAsyncHelper', function(name) {
       debug('getting async helper "%s"', name);
-      return this.get(['_.helpers.async', name]);
+      return async.getHelper(name);
     });
 
     /**
@@ -164,7 +171,7 @@ module.exports = function() {
      */
 
     app.define('hasHelper', function(name) {
-      return typeof this.getHelper(name) === 'function';
+      return typeof sync.getHelper(name) === 'function';
     });
 
     /**
@@ -182,7 +189,7 @@ module.exports = function() {
      */
 
     app.define('hasAsyncHelper', function(name) {
-      return typeof this.getAsyncHelper(name) === 'function';
+      return typeof async.getHelper(name) === 'function';
     });
 
     /**
@@ -206,44 +213,42 @@ module.exports = function() {
 
     app.define('helperGroup', function(name, helpers, isAsync) {
       debug('registering helper group "%s"', name);
-      var type = isAsync ? 'async' : 'sync';
-
-      var group = this._.helpers[type][name] || (this._.helpers[type][name] = {});
-      if (typeof helpers === 'function' && utils.isHelperGroup(helpers)) {
-        Object.defineProperty(helpers, 'isGroup', {
-          enumerable: false,
-          configurable: false,
-          value: true
-        });
-
-        if (isAsync === true) {
-          decorateHelpers(helpers, helpers, isAsync);
-        }
-
-        decorateHelpers(helpers, group, isAsync, true);
-        this._.helpers[type][name] = helpers;
-        return this;
+      if (isAsync) {
+        async.loadGroup(name, helpers);
+      } else {
+        sync.loadGroup(name, helpers);
       }
-
-      helpers = utils.arrayify(helpers);
-      var loader = utils.loader(group, {async: isAsync});
-      loader.call(loader, helpers);
       return this;
     });
   };
 };
 
-function decorateHelpers(oldHelpers, newHelpers, isAsync, override) {
-  for (let key in newHelpers) {
-    if (newHelpers.hasOwnProperty(key)) {
-      // "newHelpers" is the helpers being passed by the user
-      if (override === true && oldHelpers[key]) continue;
-      let fn = newHelpers[key];
-      if (typeof fn === 'function') {
-        fn.async = isAsync;
-      }
-      oldHelpers[key] = fn;
-    }
+/**
+ * Return false if `app` is not a valid instance of `Base`, or
+ * the `base-helpers` plugin is alread registered.
+ */
+
+function isValid(app) {
+  if (isValidApp(app, 'base-helpers', ['app', 'views', 'collection'])) {
+    debug('initializing <%s>, from <%s>', __filename, module.parent.id);
+    return true;
   }
+  return false;
 }
 
+/**
+ * Return true if the given value is a helper "group"
+ */
+
+function isHelperGroup(helpers) {
+  if (!helpers) return false;
+  if (typeof helpers === 'function' || isObject(helpers)) {
+    var len = Object.keys(helpers).length;
+    var min = helpers.async ? 1 : 0;
+    return helpers.isGroup === true || len > min;
+  }
+  if (Array.isArray(helpers)) {
+    return helpers.isGroup === true;
+  }
+  return false;
+}
